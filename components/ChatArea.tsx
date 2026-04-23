@@ -7,6 +7,7 @@ interface Props {
   state: AppState;
   isLoading: boolean;
   onSendMessage: (text: string) => void;
+  onNavigate: (view: string) => void;
 }
 
 function renderMarkdown(text: string): string {
@@ -40,14 +41,13 @@ const SUGGESTIONS = [
 ];
 
 const QUICK_ACTIONS = [
-  { label: "📝 Buat soal latihan", prompt: "Buat 5 soal latihan tentang " },
-  { label: "🗺️ Buatkan mind map", prompt: "Buatkan mind map untuk topik " },
-  { label: "🃏 Buat flashcard", prompt: "Buat 10 flashcard untuk " },
-  { label: "📄 Worksheet PDF", prompt: "Buat worksheet latihan soal tentang " },
-  { label: "📅 Rencana belajar", prompt: "Buat rencana belajar selama 4 minggu untuk " },
+  { label: "📋 Rencana Belajar", view: "studyplan" },
+  { label: "🗺️ Mind Map", view: "mindmap" },
+  { label: "🃏 Flashcards", view: "flashcards" },
+  { label: "📄 Worksheet PDF", view: "worksheet" },
 ];
 
-export default function ChatArea({ folder, state, isLoading, onSendMessage }: Props) {
+export default function ChatArea({ folder, state, isLoading, onSendMessage, onNavigate }: Props) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -147,7 +147,7 @@ export default function ChatArea({ folder, state, isLoading, onSendMessage }: Pr
       <div className="chat-input-area">
         <div className="quick-actions">
           {QUICK_ACTIONS.map((qa, i) => (
-            <button key={i} className="quick-btn" onClick={() => setInput(qa.prompt)}>
+            <button key={i} className="quick-btn" onClick={() => onNavigate(qa.view)}>
               {qa.label}
             </button>
           ))}
