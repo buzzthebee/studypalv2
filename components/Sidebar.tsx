@@ -16,6 +16,7 @@ const NAV = [
   { id: "studyplan", icon: "📋", label: "Study Plan" },
   { id: "mindmap", icon: "🗺️", label: "Mind Map" },
   { id: "flashcards", icon: "🃏", label: "Flashcards" },
+  { id: "worksheet", icon: "📄", label: "Worksheet" },
   { id: "progress", icon: "📊", label: "Progress" },
   { id: "settings", icon: "⚙️", label: "Pengaturan" },
 ];
