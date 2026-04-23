@@ -4,13 +4,13 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 
-async function callGroq(prompt: string): Promise<string> {
+async function callGroq(prompt: string, maxTokens = 1200): Promise<string> {
   const res = await fetch(GROQ_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${GROQ_API_KEY}` },
     body: JSON.stringify({
       model: GROQ_MODEL,
-      max_tokens: 2048,
+      max_tokens: maxTokens,
       temperature: 0.6,
       messages: [
         { role: "system", content: "Asisten pendidikan. Kembalikan HANYA JSON valid, tanpa markdown/backtick." },
@@ -39,15 +39,21 @@ export async function POST(req: NextRequest) {
       studyplan: `{"title":str,"totalWeeks":int,"tasks":[{"id":str,"title":str,"subject":str,"dueDate":"YYYY-MM-DD","priority":"high"|"medium"|"low","completed":false,"notes":str}]}`,
     };
 
+    // Cap output sizes to stay within Groq free-tier 12k TPM
+    const cardCount = Math.min(options?.count || 10, 10);
+    const qCount = Math.min(options?.questionCount || 8, 8);
+    const weeks = Math.min(options?.weeks || 4, 4);
+
     const PROMPTS: Record<string, string> = {
-      mindmap:
-        `Buat mind map topik "${topic}" untuk ${role}. 4-6 subtopik, masing-masing 2-4 detail.`,
-      flashcards:
-        `Buat ${options?.count || 10} flashcard topik "${topic}" untuk ${role}. Variasikan: definisi, contoh, perbandingan, aplikasi.`,
-      worksheet:
-        `Buat worksheet "${topic}" untuk ${role} (${name}), tanggal ${new Date().toLocaleDateString("id-ID")}, ${options?.questionCount || 10} soal. ~70% pilihan ganda, ~30% essay.`,
-      studyplan:
-        `Buat rencana belajar ${options?.weeks || 4} minggu untuk "${topic}", ${role}, nama ${name}. 3-5 tugas/minggu, dari dasar ke kompleks.`,
+      mindmap:   `Buat mind map topik "${topic}" untuk ${role}. 4 subtopik, masing-masing 2-3 detail.`,
+      flashcards:`Buat ${cardCount} flashcard topik "${topic}" untuk ${role}. Variasikan: definisi, contoh, perbandingan, aplikasi.`,
+      worksheet: `Buat worksheet "${topic}" untuk ${role} (${name}), tanggal ${new Date().toLocaleDateString("id-ID")}, ${qCount} soal. ~70% pilihan ganda, ~30% essay.`,
+      studyplan: `Buat rencana belajar ${weeks} minggu untuk "${topic}", ${role}, nama ${name}. 3 tugas/minggu, dari dasar ke kompleks.`,
+    };
+
+    // Token budget per type (prompt ~200tk + response must stay under 12k TPM total)
+    const MAX_TOKENS: Record<string, number> = {
+      mindmap: 900, flashcards: 800, worksheet: 1000, studyplan: 700,
     };
 
     const ERRORS: Record<string, string> = {
@@ -62,7 +68,7 @@ export async function POST(req: NextRequest) {
     }
 
     const prompt = `${PROMPTS[type]}\nSchema JSON: ${SCHEMAS[type]}\nBahasa Indonesia.`;
-    const raw = await callGroq(prompt);
+    const raw = await callGroq(prompt, MAX_TOKENS[type]);
 
     try {
       const data = parseJSON(raw);
