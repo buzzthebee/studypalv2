@@ -10,38 +10,6 @@ interface Props {
 
 const DAYS = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"];
 
-const exportToGoogleCalendar = (task: StudyTask) => {
-  const startDate = task.dueDate.replace(/-/g, ""); // format YYYYMMDD
-  const url = new URL("https://calendar.google.com/calendar/render");
-  url.searchParams.set("action", "TEMPLATE");
-  url.searchParams.set("text", task.title);
-  url.searchParams.set("dates", `${startDate}/${startDate}`);
-  url.searchParams.set("details", task.notes || `Mata pelajaran: ${task.subject}`);
-  window.open(url.toString(), "_blank");
-};
-
-const exportWeeklyToCalendar = (task: WeeklyTask) => {
-  // Hitung tanggal hari ini berdasarkan day name
-  const dayIndex = ["Senin","Selasa","Rabu","Kamis","Jumat","Sabtu","Minggu"].indexOf(task.day);
-  const today = new Date();
-  const todayDay = today.getDay() === 0 ? 6 : today.getDay() - 1; // 0=Senin
-  const diff = dayIndex - todayDay;
-  const targetDate = new Date(today);
-  targetDate.setDate(today.getDate() + diff);
-  
-  const dateStr = targetDate.toISOString().split("T")[0].replace(/-/g, "");
-  const startTime = `${dateStr}T080000`; // default jam 8 pagi
-  const endTime = `${dateStr}T${String(8 + Math.floor(task.duration / 60)).padStart(2,"0")}${String(task.duration % 60).padStart(2,"0")}00`;
-  
-  const url = new URL("https://calendar.google.com/calendar/render");
-  url.searchParams.set("action", "TEMPLATE");
-  url.searchParams.set("text", `📚 ${task.title}`);
-  url.searchParams.set("dates", `${startTime}/${endTime}`);
-  url.searchParams.set("details", `Belajar: ${task.subject} | Durasi: ${task.duration} menit`);
-  url.searchParams.set("recur", "RRULE:FREQ=WEEKLY"); // recurring mingguan!
-  window.open(url.toString(), "_blank");
-};
-
 export default function StudyPlan({ state, setState }: Props) {
   const [tab, setTab] = useState<"todo" | "weekly">("todo");
   const [showAdd, setShowAdd] = useState(false);
@@ -116,6 +84,43 @@ export default function StudyPlan({ state, setState }: Props) {
 
   const deleteTask = (id: string) => {
     setState(p => ({ ...p, studyTasks: p.studyTasks.filter(t => t.id !== id) }));
+  };
+
+  const exportToGoogleCalendar = (task: StudyTask) => {
+    const startDate = task.dueDate.replace(/-/g, "");
+    const url = new URL("https://calendar.google.com/calendar/render");
+    url.searchParams.set("action", "TEMPLATE");
+    url.searchParams.set("text", task.title);
+    url.searchParams.set("dates", `${startDate}/${startDate}`);
+    url.searchParams.set("details", task.notes ? `${task.notes}\nMata pelajaran: ${task.subject}` : `Mata pelajaran: ${task.subject}`);
+    window.open(url.toString(), "_blank");
+  };
+
+  const exportWeeklyToCalendar = (task: WeeklyTask) => {
+    const dayMap: Record<string, number> = { Senin: 1, Selasa: 2, Rabu: 3, Kamis: 4, Jumat: 5, Sabtu: 6, Minggu: 0 };
+    const today = new Date();
+    const todayDay = today.getDay();
+    const targetDay = dayMap[task.day];
+    const diff = (targetDay - todayDay + 7) % 7;
+    const targetDate = new Date(today);
+    targetDate.setDate(today.getDate() + diff);
+
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const dateStr = `${targetDate.getFullYear()}${pad(targetDate.getMonth() + 1)}${pad(targetDate.getDate())}`;
+    const startHour = 8;
+    const endHour = startHour + Math.floor(task.duration / 60);
+    const endMin = task.duration % 60;
+    const startTime = `${dateStr}T${pad(startHour)}0000`;
+    const endTime = `${dateStr}T${pad(endHour)}${pad(endMin)}00`;
+
+    const dayAbbr: Record<string, string> = { Senin: "MO", Selasa: "TU", Rabu: "WE", Kamis: "TH", Jumat: "FR", Sabtu: "SA", Minggu: "SU" };
+    const url = new URL("https://calendar.google.com/calendar/render");
+    url.searchParams.set("action", "TEMPLATE");
+    url.searchParams.set("text", `📚 ${task.title}`);
+    url.searchParams.set("dates", `${startTime}/${endTime}`);
+    url.searchParams.set("details", `Belajar: ${task.subject} | Durasi: ${task.duration} menit`);
+    url.searchParams.set("recur", `RRULE:FREQ=WEEKLY;BYDAY=${dayAbbr[task.day]}`);
+    window.open(url.toString(), "_blank");
   };
 
   return (
@@ -223,6 +228,9 @@ export default function StudyPlan({ state, setState }: Props) {
                     </div>
                     {task.notes && <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 4 }}>{task.notes}</div>}
                   </div>
+                  <button className="btn btn-secondary btn-icon" onClick={() => exportToGoogleCalendar(task)} title="Export ke Google Calendar">
+                    📅
+                  </button>
                   <button className="btn btn-danger btn-icon" onClick={() => deleteTask(task.id)} title="Hapus">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
                   </button>
@@ -273,6 +281,9 @@ export default function StudyPlan({ state, setState }: Props) {
                         <span>⏱️ {task.duration} menit</span>
                       </div>
                     </div>
+                    <button className="btn btn-secondary btn-icon" onClick={() => exportWeeklyToCalendar(task)} title="Tambah ke Google Calendar">
+                      📅
+                    </button>
                   </div>
                 ))}
               </div>
