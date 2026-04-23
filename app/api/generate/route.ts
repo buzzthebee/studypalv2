@@ -7,19 +7,13 @@ const GROQ_MODEL = "llama-3.3-70b-versatile";
 async function callGroq(prompt: string): Promise<string> {
   const res = await fetch(GROQ_URL, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${GROQ_API_KEY}`,
-    },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${GROQ_API_KEY}` },
     body: JSON.stringify({
       model: GROQ_MODEL,
       max_tokens: 2048,
       temperature: 0.6,
       messages: [
-        {
-          role: "system",
-          content: "Kamu adalah asisten pendidikan. Selalu kembalikan HANYA JSON valid tanpa markdown, backtick, atau teks tambahan apapun.",
-        },
+        { role: "system", content: "Asisten pendidikan. Kembalikan HANYA JSON valid, tanpa markdown/backtick." },
         { role: "user", content: prompt },
       ],
     }),
@@ -28,161 +22,56 @@ async function callGroq(prompt: string): Promise<string> {
   return data.choices?.[0]?.message?.content || "";
 }
 
+function parseJSON(raw: string) {
+  return JSON.parse(raw.replace(/```json|```/g, "").trim());
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { type, topic, userRole, userName, options } = await req.json();
+    const role = userRole || "pelajar";
+    const name = userName || "Pelajar";
 
-    if (type === "mindmap") {
-      const prompt = `Buat mind map untuk topik "${topic}" yang cocok untuk ${userRole || "pelajar"}.
-      
-      Kembalikan HANYA JSON valid dengan struktur berikut (tanpa markdown/backtick):
-      {
-        "title": "${topic}",
-        "rootNode": {
-          "id": "root",
-          "label": "${topic}",
-          "color": "#6C63FF",
-          "children": [
-            {
-              "id": "1",
-              "label": "Subtopik 1",
-              "color": "#FF6584",
-              "children": [
-                {"id": "1-1", "label": "Detail 1", "color": "#43CBFF", "children": []},
-                {"id": "1-2", "label": "Detail 2", "color": "#43CBFF", "children": []}
-              ]
-            },
-            {
-              "id": "2", 
-              "label": "Subtopik 2",
-              "color": "#6FCF97",
-              "children": [
-                {"id": "2-1", "label": "Detail A", "color": "#F7B731", "children": []}
-              ]
-            }
-          ]
-        }
-      }
-      
-      Buat 4-6 subtopik utama, masing-masing dengan 2-4 detail. Sesuaikan dengan tingkat ${userRole || "pelajar"}.`;
+    const SCHEMAS: Record<string, string> = {
+      mindmap: `{"title":str,"rootNode":{"id":"root","label":str,"color":"#6C63FF","children":[{"id":str,"label":str,"color":str,"children":[{"id":str,"label":str,"color":str,"children":[]}]}]}}`,
+      flashcards: `{"title":str,"cards":[{"id":str,"front":str,"back":str,"mastered":false,"reviewCount":0}]}`,
+      worksheet: `{"title":str,"subject":str,"userRole":str,"userName":str,"date":str,"instructions":str,"sections":[{"type":"pilihan_ganda"|"essay","title":str,"questions":[{"no":int,"question":str,"options":["A...","B...","C...","D..."]|null,"answer":str,"explanation":str,"points":int|null}]}]}`,
+      studyplan: `{"title":str,"totalWeeks":int,"tasks":[{"id":str,"title":str,"subject":str,"dueDate":"YYYY-MM-DD","priority":"high"|"medium"|"low","completed":false,"notes":str}]}`,
+    };
 
-      const raw = await callGroq(prompt);
-      try {
-        const clean = raw.replace(/```json|```/g, "").trim();
-        const json = JSON.parse(clean);
-        return NextResponse.json({ success: true, data: json });
-      } catch {
-        return NextResponse.json({ success: false, error: "Gagal parse mind map" });
-      }
+    const PROMPTS: Record<string, string> = {
+      mindmap:
+        `Buat mind map topik "${topic}" untuk ${role}. 4-6 subtopik, masing-masing 2-4 detail.`,
+      flashcards:
+        `Buat ${options?.count || 10} flashcard topik "${topic}" untuk ${role}. Variasikan: definisi, contoh, perbandingan, aplikasi.`,
+      worksheet:
+        `Buat worksheet "${topic}" untuk ${role} (${name}), tanggal ${new Date().toLocaleDateString("id-ID")}, ${options?.questionCount || 10} soal. ~70% pilihan ganda, ~30% essay.`,
+      studyplan:
+        `Buat rencana belajar ${options?.weeks || 4} minggu untuk "${topic}", ${role}, nama ${name}. 3-5 tugas/minggu, dari dasar ke kompleks.`,
+    };
+
+    const ERRORS: Record<string, string> = {
+      mindmap: "Gagal parse mind map",
+      flashcards: "Gagal parse flashcards",
+      worksheet: "Gagal generate worksheet",
+      studyplan: "Gagal generate study plan",
+    };
+
+    if (!PROMPTS[type]) {
+      return NextResponse.json({ success: false, error: "Unknown type" });
     }
 
-    if (type === "flashcards") {
-      const count = options?.count || 10;
-      const prompt = `Buat ${count} flashcard untuk topik "${topic}" yang cocok untuk ${userRole || "pelajar"}.
-      
-      Kembalikan HANYA JSON valid (tanpa markdown/backtick):
-      {
-        "title": "${topic}",
-        "cards": [
-          {"id": "1", "front": "Pertanyaan/Istilah", "back": "Jawaban/Definisi lengkap", "mastered": false, "reviewCount": 0},
-          {"id": "2", "front": "Pertanyaan 2", "back": "Jawaban 2", "mastered": false, "reviewCount": 0}
-        ]
-      }
-      
-      Pastikan pertanyaan beragam: definisi, contoh, perbandingan, aplikasi. Sesuaikan dengan ${userRole}. Buat tepat ${count} kartu.`;
+    const prompt = `${PROMPTS[type]}\nSchema JSON: ${SCHEMAS[type]}\nBahasa Indonesia.`;
+    const raw = await callGroq(prompt);
 
-      const raw = await callGroq(prompt);
-      try {
-        const clean = raw.replace(/```json|```/g, "").trim();
-        const json = JSON.parse(clean);
-        return NextResponse.json({ success: true, data: json });
-      } catch {
-        return NextResponse.json({ success: false, error: "Gagal parse flashcards" });
-      }
+    try {
+      const data = parseJSON(raw);
+      return NextResponse.json({ success: true, data });
+    } catch {
+      return NextResponse.json({ success: false, error: ERRORS[type] });
     }
-
-    if (type === "worksheet") {
-      const questionCount = options?.questionCount || 10;
-      const prompt = `Buat worksheet/lembar kerja latihan soal tentang "${topic}" untuk ${userRole || "pelajar"}.
-      
-      Kembalikan HANYA JSON valid (tanpa markdown/backtick):
-      {
-        "title": "Worksheet: ${topic}",
-        "subject": "${topic}",
-        "userRole": "${userRole}",
-        "userName": "${userName || 'Pelajar'}",
-        "date": "${new Date().toLocaleDateString("id-ID")}",
-        "instructions": "Kerjakan soal-soal berikut dengan teliti.",
-        "sections": [
-          {
-            "type": "pilihan_ganda",
-            "title": "Pilihan Ganda",
-            "questions": [
-              {
-                "no": 1,
-                "question": "Teks soal",
-                "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
-                "answer": "A",
-                "explanation": "Penjelasan jawaban"
-              }
-            ]
-          },
-          {
-            "type": "essay",
-            "title": "Uraian",
-            "questions": [
-              {"no": 1, "question": "Pertanyaan essay", "points": 10, "answer": "Kunci jawaban"}
-            ]
-          }
-        ]
-      }`;
-
-      const raw = await callGroq(prompt);
-      try {
-        const clean = raw.replace(/```json|```/g, "").trim();
-        const json = JSON.parse(clean);
-        return NextResponse.json({ success: true, data: json });
-      } catch {
-        return NextResponse.json({ success: false, error: "Gagal generate worksheet" });
-      }
-    }
-
-    if (type === "studyplan") {
-      const prompt = `Buat rencana belajar selama ${options?.weeks || 4} minggu untuk topik "${topic}" bagi ${userRole || "pelajar"} bernama ${userName || "Pelajar"}.
-      
-      Kembalikan HANYA JSON valid (tanpa markdown/backtick):
-      {
-        "title": "Rencana Belajar: ${topic}",
-        "totalWeeks": ${options?.weeks || 4},
-        "tasks": [
-          {
-            "id": "1",
-            "title": "Judul tugas",
-            "subject": "${topic}",
-            "dueDate": "2024-01-07",
-            "priority": "high",
-            "completed": false,
-            "notes": "Catatan tambahan"
-          }
-        ]
-      }
-      
-      Buat 3-5 tugas per minggu, mulai dari yang mendasar ke yang kompleks.`;
-
-      const raw = await callGroq(prompt);
-      try {
-        const clean = raw.replace(/```json|```/g, "").trim();
-        const json = JSON.parse(clean);
-        return NextResponse.json({ success: true, data: json });
-      } catch {
-        return NextResponse.json({ success: false, error: "Gagal generate study plan" });
-      }
-    }
-
-    return NextResponse.json({ success: false, error: "Unknown type" });
   } catch (error) {
     console.error("Generate API error:", error);
     return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
   }
 }
-
