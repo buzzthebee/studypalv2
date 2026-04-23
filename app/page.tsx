@@ -1,4 +1,4 @@
-"use client";
+  "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import Sidebar from "@/components/Sidebar";
 import ChatArea from "@/components/ChatArea";
@@ -131,7 +131,10 @@ export default function Home() {
             folder={currentFolder}
             state={state}
             isLoading={isLoading}
-            onSendMessage={sendMessage}
+            onSendMessage={(text) => {
+            sendMessage(text);
+            setActiveView("chat");
+}}
             onNavigate={(view) => setActiveView(view as any)}
           />
         )}
