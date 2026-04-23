@@ -119,6 +119,8 @@ export default function MindMap({ state, setState, onSendMessage }: Props) {
 
 function MindMapCanvas({ map, onAskAI }: { map: MindMapType; onAskAI: (label: string) => void }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set(["root"]));
+  const [activeDesc, setActiveDesc] = useState<string | null>(null);
+  const [descNode, setDescNode] = useState<{ label: string; description: string; color: string } | null>(null);
 
   const toggle = (id: string) => {
     setExpanded(prev => {
@@ -128,56 +130,165 @@ function MindMapCanvas({ map, onAskAI }: { map: MindMapType; onAskAI: (label: st
     });
   };
 
+  const showDesc = (node: MindMapNode) => {
+    if (!node.description) return;
+    if (activeDesc === node.id) {
+      setActiveDesc(null);
+      setDescNode(null);
+    } else {
+      setActiveDesc(node.id);
+      setDescNode({ label: node.label, description: node.description, color: node.color || "#6C63FF" });
+    }
+  };
+
   return (
-    <div style={{ padding: 40, minHeight: "100%", display: "flex", alignItems: "flex-start", justifyContent: "center" }}>
-      <div style={{ textAlign: "center" }}>
-        <h2 style={{ fontFamily: "var(--font-head)", fontWeight: 800, color: "var(--text)", marginBottom: 32, fontSize: 22 }}>
-          {map.title}
-        </h2>
-        <TreeNode node={map.rootNode} expanded={expanded} toggle={toggle} onAskAI={onAskAI} depth={0} isRoot />
-      </div>
+    <div style={{ padding: 40, minHeight: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <h2 style={{ fontFamily: "var(--font-head)", fontWeight: 800, color: "var(--text)", marginBottom: 8, fontSize: 22 }}>
+        {map.title}
+      </h2>
+      <p style={{ color: "var(--text3)", fontSize: 12, marginBottom: 24 }}>
+        💡 Klik node untuk expand/collapse • Klik 2x untuk tanya AI • Klik sekali pada node terbuka untuk lihat deskripsi
+      </p>
+
+      {/* Description popup */}
+      {descNode && (
+        <div style={{
+          background: "var(--surface)",
+          border: `2px solid ${descNode.color}`,
+          borderRadius: 12,
+          padding: "14px 18px",
+          marginBottom: 24,
+          maxWidth: 560,
+          width: "100%",
+          boxShadow: `0 4px 24px ${descNode.color}30`,
+          animation: "fadeIn 0.2s ease",
+          position: "relative",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <div style={{
+              background: descNode.color,
+              color: "white",
+              borderRadius: 20,
+              padding: "3px 12px",
+              fontWeight: 700,
+              fontSize: 13,
+            }}>
+              {descNode.label}
+            </div>
+            <button
+              onClick={() => { setActiveDesc(null); setDescNode(null); }}
+              style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", marginLeft: "auto", fontSize: 16, lineHeight: 1 }}
+            >✕</button>
+          </div>
+          <p style={{ color: "var(--text)", fontSize: 14, lineHeight: 1.6, margin: 0 }}>
+            {descNode.description}
+          </p>
+        </div>
+      )}
+
+      <TreeNode
+        node={map.rootNode}
+        expanded={expanded}
+        toggle={toggle}
+        onAskAI={onAskAI}
+        onShowDesc={showDesc}
+        activeDesc={activeDesc}
+        depth={0}
+        isRoot
+      />
     </div>
   );
 }
 
 function TreeNode({
-  node, expanded, toggle, onAskAI, depth, isRoot
+  node, expanded, toggle, onAskAI, onShowDesc, activeDesc, depth, isRoot
 }: {
   node: MindMapNode;
   expanded: Set<string>;
   toggle: (id: string) => void;
   onAskAI: (label: string) => void;
+  onShowDesc: (node: MindMapNode) => void;
+  activeDesc: string | null;
   depth: number;
   isRoot?: boolean;
 }) {
   const isExpanded = expanded.has(node.id);
   const hasChildren = node.children && node.children.length > 0;
+  const hasDesc = !!node.description;
+  const isDescActive = activeDesc === node.id;
   const colors = ["#6C63FF", "#FF6584", "#43CBFF", "#6FCF97", "#F7B731", "#FF8C5A", "#A855F7", "#14B8A6"];
   const color = node.color || colors[depth % colors.length];
 
+  const handleClick = () => {
+    if (hasChildren) {
+      toggle(node.id);
+    } else if (hasDesc) {
+      onShowDesc(node);
+    }
+  };
+
+  const handleSingleClickExpanded = (e: React.MouseEvent) => {
+    // For nodes that are already expanded and have description, show desc on single click
+    // But we already handle this in the node click — just show desc if no children
+    if (!hasChildren && hasDesc) {
+      onShowDesc(node);
+    } else if (hasChildren && isExpanded && hasDesc) {
+      // Show description bubble without collapsing on right-click or a dedicated button
+    }
+  };
+
   return (
     <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
-      <div
-        onClick={() => { toggle(node.id); }}
-        onDoubleClick={() => onAskAI(node.label)}
-        style={{
-          padding: isRoot ? "14px 28px" : "9px 20px",
-          borderRadius: 50,
-          background: isRoot ? color : `${color}22`,
-          color: isRoot ? "white" : color,
-          border: `2px solid ${color}`,
-          fontWeight: 700,
-          fontSize: isRoot ? 16 : depth === 1 ? 14 : 12,
-          cursor: "pointer",
-          transition: "all 0.2s",
-          whiteSpace: "nowrap",
-          boxShadow: isRoot ? `0 4px 20px ${color}40` : undefined,
-          userSelect: "none",
-        }}
-        title={hasChildren ? (isExpanded ? "Klik untuk collapse · Double klik untuk tanya AI" : "Klik untuk expand") : "Double klik untuk tanya AI"}
-      >
-        {node.label}
-        {hasChildren && <span style={{ marginLeft: 6, opacity: 0.7, fontSize: 10 }}>{isExpanded ? "▲" : "▼"}</span>}
+      <div style={{ position: "relative", display: "inline-flex", flexDirection: "column", alignItems: "center" }}>
+        <div
+          onClick={handleClick}
+          onDoubleClick={() => onAskAI(node.label)}
+          style={{
+            padding: isRoot ? "14px 28px" : "9px 20px",
+            borderRadius: 50,
+            background: isDescActive ? color : (isRoot ? color : `${color}22`),
+            color: isDescActive ? "white" : (isRoot ? "white" : color),
+            border: `2px solid ${color}`,
+            fontWeight: 700,
+            fontSize: isRoot ? 16 : depth === 1 ? 14 : 12,
+            cursor: "pointer",
+            transition: "all 0.2s",
+            whiteSpace: "nowrap",
+            boxShadow: isRoot ? `0 4px 20px ${color}40` : isDescActive ? `0 2px 12px ${color}60` : undefined,
+            userSelect: "none",
+          }}
+          title={
+            hasChildren
+              ? (isExpanded ? "Klik untuk collapse · Double klik untuk tanya AI" : "Klik untuk expand")
+              : (hasDesc ? "Klik untuk lihat deskripsi · Double klik untuk tanya AI" : "Double klik untuk tanya AI")
+          }
+        >
+          {node.label}
+          {hasChildren && <span style={{ marginLeft: 6, opacity: 0.7, fontSize: 10 }}>{isExpanded ? "▲" : "▼"}</span>}
+          {!hasChildren && hasDesc && <span style={{ marginLeft: 6, opacity: 0.7, fontSize: 10 }}>ℹ</span>}
+        </div>
+
+        {/* Show desc button for parent nodes (nodes with children) */}
+        {hasChildren && hasDesc && isExpanded && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onShowDesc(node); }}
+            style={{
+              background: isDescActive ? color : `${color}22`,
+              border: `1px solid ${color}`,
+              borderRadius: 20,
+              color: isDescActive ? "white" : color,
+              fontSize: 10,
+              padding: "2px 8px",
+              cursor: "pointer",
+              marginTop: 4,
+              fontWeight: 600,
+              transition: "all 0.15s",
+            }}
+            title="Lihat deskripsi"
+          >
+            {isDescActive ? "✕ tutup" : "ℹ info"}
+          </button>
+        )}
       </div>
 
       {hasChildren && isExpanded && (
@@ -199,7 +310,15 @@ function TreeNode({
             {node.children.map(child => (
               <div key={child.id} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                 <div style={{ width: 2, height: 20, background: `${color}40` }} />
-                <TreeNode node={child} expanded={expanded} toggle={toggle} onAskAI={onAskAI} depth={depth + 1} />
+                <TreeNode
+                  node={child}
+                  expanded={expanded}
+                  toggle={toggle}
+                  onAskAI={onAskAI}
+                  onShowDesc={onShowDesc}
+                  activeDesc={activeDesc}
+                  depth={depth + 1}
+                />
               </div>
             ))}
           </div>
