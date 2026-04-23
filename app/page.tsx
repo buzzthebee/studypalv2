@@ -7,13 +7,14 @@ import MindMap from "@/components/MindMap";
 import Flashcards from "@/components/Flashcards";
 import Progress from "@/components/Progress";
 import Settings from "@/components/Settings";
+import Worksheet from "@/components/Worksheet";
 import OnboardingModal from "@/components/OnboardingModal";
 import { AppState, Message, ChatFolder, StudyTask, FlashcardDeck, WeeklyTask } from "@/lib/types";
 import { getInitialState, saveState } from "@/lib/storage";
 
 export default function Home() {
   const [state, setState] = useState<AppState | null>(null);
-  const [activeView, setActiveView] = useState<"chat" | "studyplan" | "mindmap" | "flashcards" | "progress" | "settings">("chat");
+  const [activeView, setActiveView] = useState<"chat" | "studyplan" | "mindmap" | "flashcards" | "worksheet" | "progress" | "settings">("chat");
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [activeChatId, setActiveChatId] = useState<string>("default");
@@ -131,6 +132,7 @@ export default function Home() {
             state={state}
             isLoading={isLoading}
             onSendMessage={sendMessage}
+            onNavigate={(view) => setActiveView(view as any)}
           />
         )}
         {activeView === "studyplan" && (
@@ -141,6 +143,9 @@ export default function Home() {
         )}
         {activeView === "flashcards" && (
           <Flashcards state={state} setState={setState} onSendMessage={sendMessage} />
+        )}
+        {activeView === "worksheet" && (
+          <Worksheet state={state} />
         )}
         {activeView === "progress" && (
           <Progress state={state} setState={setState} />
