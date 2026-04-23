@@ -16,6 +16,7 @@ export default function StudyPlan({ state, setState }: Props) {
   const [showAddWeekly, setShowAddWeekly] = useState(false);
   const [aiTopic, setAiTopic] = useState("");
   const [loadingAI, setLoadingAI] = useState(false);
+  const [aiError, setAiError] = useState("");
   const [form, setForm] = useState({ title: "", subject: "", dueDate: "", priority: "medium" as const, notes: "" });
   const [weeklyForm, setWeeklyForm] = useState({ title: "", day: "Senin", subject: "", duration: 60 });
 
@@ -65,6 +66,7 @@ export default function StudyPlan({ state, setState }: Props) {
   };
 
   const generateAIPlan = async () => {
+    setAiError("");
     if (!aiTopic.trim()) return;
     setLoadingAI(true);
     try {
@@ -77,8 +79,10 @@ export default function StudyPlan({ state, setState }: Props) {
       if (data.success && data.data.tasks) {
         setState(p => ({ ...p, studyTasks: [...p.studyTasks, ...data.data.tasks] }));
         setAiTopic("");
+      } else {
+        setAiError(data.error || "Gagal generate. Coba lagi.");
       }
-    } catch {}
+    } catch { setAiError("Gagal terhubung ke server."); }
     setLoadingAI(false);
   };
 
@@ -150,6 +154,7 @@ export default function StudyPlan({ state, setState }: Props) {
             {loadingAI ? "⏳" : "✨ Generate"}
           </button>
         </div>
+        {aiError && <div style={{ marginTop: 8, fontSize: 13, color: "var(--error, #e53e3e)" }}>⚠️ {aiError}</div>}
       </div>
 
       {/* Progress bar */}
