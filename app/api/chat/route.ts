@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const N8N_WEBHOOK = process.env.N8N_WEBHOOK_URL || "";
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "AIzaSyA-SkA6Fj81ubsaaC12Xdx-_6YK497gYGM";
+const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 export async function POST(req: NextRequest) {
