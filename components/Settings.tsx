@@ -245,80 +245,168 @@ async function generatePDF(worksheet: any, userName: string, aiName: string) {
   const mcQuestions = worksheet.sections?.find((s: any) => s.type === "pilihan_ganda");
   const essayQuestions = worksheet.sections?.find((s: any) => s.type === "essay");
 
-  // Buat elemen container sementara di DOM (tidak terlihat user)
-  const container = document.createElement("div");
-  container.style.cssText = "position:fixed;left:-9999px;top:0;width:794px;background:#fff;color:#111;font-family:'Times New Roman',serif;font-size:12pt;padding:40px;box-sizing:border-box;";
+  const safeTitle = (worksheet.title || "worksheet").replace(/[^a-zA-Z0-9 ]/g, "").trim();
 
-  container.innerHTML = `
-    <div style="text-align:center;border-bottom:2px solid #333;padding-bottom:12px;margin-bottom:20px;">
-      <h1 style="font-size:16pt;font-weight:900;margin:0 0 4px;">${worksheet.title}</h1>
-      <p style="margin:2px;font-size:11pt;">Dibuat oleh ${aiName} · ${worksheet.date}</p>
-    </div>
-    <div style="display:flex;justify-content:space-between;margin:16px 0;font-size:11pt;">
-      <div>Nama: <span style="border-bottom:1px solid #888;min-width:200px;display:inline-block;">${userName || "________________"}</span></div>
-      <div>Kelas: <span style="border-bottom:1px solid #888;min-width:120px;display:inline-block;">________________</span></div>
-      <div>Tanggal: <span style="border-bottom:1px solid #888;min-width:120px;display:inline-block;">${worksheet.date}</span></div>
-    </div>
-    <p style="font-style:italic;color:#555;margin-bottom:14px;font-size:11pt;border-left:3px solid #888;padding-left:10px;">📌 ${worksheet.instructions}</p>
+  const html = `<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>${worksheet.title}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 12pt;
+    color: #111;
+    padding: 30px 40px;
+    background: #fff;
+  }
+  .header {
+    text-align: center;
+    border-bottom: 2px solid #333;
+    padding-bottom: 12px;
+    margin-bottom: 20px;
+  }
+  .header h1 { font-size: 16pt; font-weight: 900; margin-bottom: 4px; }
+  .header p { font-size: 11pt; }
+  .meta-row {
+    display: flex;
+    justify-content: space-between;
+    margin: 16px 0;
+    font-size: 11pt;
+    gap: 12px;
+  }
+  .meta-field { flex: 1; }
+  .meta-field span {
+    display: block;
+    border-bottom: 1px solid #888;
+    min-height: 20px;
+    margin-top: 2px;
+  }
+  .instructions {
+    font-style: italic;
+    color: #555;
+    margin-bottom: 18px;
+    font-size: 11pt;
+    border-left: 3px solid #888;
+    padding-left: 10px;
+  }
+  .section-title {
+    font-size: 13pt;
+    font-weight: 700;
+    margin: 24px 0 12px;
+    text-transform: uppercase;
+  }
+  .question { margin-bottom: 18px; page-break-inside: avoid; }
+  .question-text { font-weight: 600; margin-bottom: 6px; }
+  .options { margin-left: 20px; }
+  .option { margin-bottom: 4px; }
+  .answer-box {
+    border: 1px dashed #ccc;
+    min-height: 80px;
+    margin-top: 6px;
+    border-radius: 4px;
+  }
+  .answer-key {
+    margin-top: 40px;
+    border-top: 2px dashed #888;
+    padding-top: 16px;
+    page-break-before: always;
+  }
+  .answer-key-title {
+    font-size: 14pt;
+    font-weight: 900;
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  .answer-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    font-size: 11pt;
+  }
+  .answer-label { font-weight: 700; margin: 14px 0 6px; }
+  .generated-by {
+    text-align: center;
+    font-size: 9pt;
+    color: #888;
+    margin-top: 30px;
+  }
+  @media print {
+    body { padding: 20px 30px; }
+    .answer-key { page-break-before: always; }
+  }
+</style>
+</head>
+<body>
 
-    ${mcQuestions ? `
-    <div style="font-size:13pt;font-weight:700;margin:22px 0 10px;text-transform:uppercase;">A. ${mcQuestions.title}</div>
-    ${mcQuestions.questions.map((q: any) => `
-    <div style="margin-bottom:16px;">
-      <div style="font-weight:600;margin-bottom:6px;">${q.no}. ${q.question}</div>
-      <div style="margin-left:20px;">
-        ${q.options.map((opt: string) => `<div style="margin-bottom:4px;">${opt}</div>`).join("")}
-      </div>
-    </div>`).join("")}` : ""}
+<div class="header">
+  <h1>${worksheet.title}</h1>
+  <p>Dibuat oleh ${aiName} · ${worksheet.date}</p>
+</div>
 
-    ${essayQuestions ? `
-    <div style="font-size:13pt;font-weight:700;margin:22px 0 10px;text-transform:uppercase;">B. ${essayQuestions.title}</div>
-    ${essayQuestions.questions.map((q: any) => `
-    <div style="margin-bottom:16px;">
-      <div style="font-weight:600;margin-bottom:6px;">${q.no}. (${q.points} poin) ${q.question}</div>
-      <div style="border:1px dashed #ccc;min-height:80px;margin-top:6px;border-radius:4px;"></div>
-    </div>`).join("")}` : ""}
+<div class="meta-row">
+  <div class="meta-field">Nama:<span>${userName || ""}</span></div>
+  <div class="meta-field">Kelas:<span></span></div>
+  <div class="meta-field">Tanggal:<span>${worksheet.date}</span></div>
+</div>
 
-    <div style="margin-top:40px;border-top:2px dashed #888;padding-top:16px;">
-      <div style="font-size:14pt;font-weight:900;text-align:center;margin-bottom:16px;">🔑 KUNCI JAWABAN</div>
-      ${mcQuestions ? `
-      <p style="font-weight:700;margin-bottom:8px;">Pilihan Ganda:</p>
-      <div style="display:flex;flex-wrap:wrap;gap:10px 24px;">
-        ${mcQuestions.questions.map((q: any) => `<div style="font-size:11pt;">${q.no}. ${q.answer}</div>`).join("")}
-      </div>` : ""}
-      ${essayQuestions ? `
-      <p style="font-weight:700;margin-top:16px;margin-bottom:8px;">Essay:</p>
-      ${essayQuestions.questions.map((q: any) => `<p style="margin:4px 0;">${q.no}. ${q.answer}</p>`).join("")}` : ""}
-    </div>
+<p class="instructions">📌 ${worksheet.instructions}</p>
 
-    <div style="text-align:center;font-size:9pt;color:#888;margin-top:30px;">
-      Worksheet ini di-generate oleh ${aiName} · StudyPal Platform
-    </div>
-  `;
+${mcQuestions ? `
+<div class="section-title">A. ${mcQuestions.title}</div>
+${mcQuestions.questions.map((q: any) => `
+<div class="question">
+  <div class="question-text">${q.no}. ${q.question}</div>
+  <div class="options">
+    ${q.options.map((opt: string) => `<div class="option">${opt}</div>`).join("")}
+  </div>
+</div>`).join("")}` : ""}
 
-  document.body.appendChild(container);
+${essayQuestions ? `
+<div class="section-title">B. ${essayQuestions.title}</div>
+${essayQuestions.questions.map((q: any) => `
+<div class="question">
+  <div class="question-text">${q.no}. (${q.points} poin) ${q.question}</div>
+  <div class="answer-box"></div>
+</div>`).join("")}` : ""}
 
-  // Load html2pdf dari CDN lalu jalankan
-  await new Promise<void>((resolve, reject) => {
-    if ((window as any).html2pdf) { resolve(); return; }
-    const script = document.createElement("script");
-    script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Gagal load html2pdf"));
-    document.head.appendChild(script);
+<div class="answer-key">
+  <div class="answer-key-title">🔑 KUNCI JAWABAN</div>
+  ${mcQuestions ? `
+  <div class="answer-label">Pilihan Ganda:</div>
+  <div class="answer-grid">
+    ${mcQuestions.questions.map((q: any) => `<div>${q.no}. ${q.answer}</div>`).join("")}
+  </div>` : ""}
+  ${essayQuestions ? `
+  <div class="answer-label">Essay:</div>
+  ${essayQuestions.questions.map((q: any) => `<p style="margin-bottom:6px;">${q.no}. ${q.answer}</p>`).join("")}` : ""}
+</div>
+
+<div class="generated-by">Worksheet ini di-generate oleh ${aiName} · StudyPal Platform</div>
+
+<script>
+  // Tunggu render selesai lalu langsung print (Save as PDF)
+  window.addEventListener("load", function() {
+    setTimeout(function() { window.print(); }, 300);
   });
+</script>
+</body>
+</html>`;
 
-  const safeTitle = worksheet.title.replace(/[^a-zA-Z0-9 ]/g, "").trim() || "worksheet";
-  const fileName = `${safeTitle}.pdf`;
+  // Buat Blob dari HTML lalu buka di tab baru — cara ini work di Vercel
+  // karena tidak butuh library eksternal sama sekali
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
 
-  await (window as any).html2pdf().set({
-    margin: [15, 15, 15, 15],
-    filename: fileName,
-    image: { type: "jpeg", quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
-    jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-    pagebreak: { mode: ["avoid-all", "css"] },
-  }).from(container).save();
+  const a = document.createElement("a");
+  a.href = url;
+  a.target = "_blank";
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 
-  document.body.removeChild(container);
+  // Bersihkan URL object setelah tab terbuka
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
