@@ -26,6 +26,26 @@ function parseJSON(raw: string) {
   return JSON.parse(raw.replace(/```json|```/g, "").trim());
 }
 
+function sanitizeStudyPlan(data: any) {
+  const priorityMap: Record<string, string> = {
+    high: "high", medium: "medium", low: "low",
+    tinggi: "high", sedang: "medium", rendah: "low",
+    urgent: "high", normal: "medium", santai: "low",
+  };
+  if (Array.isArray(data.tasks)) {
+    data.tasks = data.tasks.map((t: any, i: number) => ({
+      id: t.id || Date.now().toString() + i,
+      title: t.title || "Tugas",
+      subject: t.subject || "",
+      dueDate: t.dueDate || new Date().toISOString().split("T")[0],
+      priority: priorityMap[(t.priority || "").toLowerCase()] || "medium",
+      completed: false,
+      notes: t.notes || "",
+    }));
+  }
+  return data;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { type, topic, userRole, userName, options } = await req.json();
@@ -39,7 +59,6 @@ export async function POST(req: NextRequest) {
       studyplan: `{"title":str,"totalWeeks":int,"tasks":[{"id":str,"title":str,"subject":str,"dueDate":"YYYY-MM-DD","priority":"high"|"medium"|"low","completed":false,"notes":str}]}`,
     };
 
-    // Cap output sizes to stay within Groq free-tier 12k TPM
     const cardCount = Math.min(options?.count || 10, 10);
     const qCount = Math.min(options?.questionCount || 8, 8);
     const weeks = Math.min(options?.weeks || 4, 4);
@@ -48,12 +67,11 @@ export async function POST(req: NextRequest) {
       mindmap:   `Buat mind map topik "${topic}" untuk ${role}. 4 subtopik, masing-masing 2-3 detail.`,
       flashcards:`Buat ${cardCount} flashcard topik "${topic}" untuk ${role}. Variasikan: definisi, contoh, perbandingan, aplikasi.`,
       worksheet: `Buat worksheet "${topic}" untuk ${role} (${name}), tanggal ${new Date().toLocaleDateString("id-ID")}, ${qCount} soal. ~70% pilihan ganda, ~30% essay.`,
-      studyplan: `Buat rencana belajar ${weeks} minggu untuk "${topic}", ${role}, nama ${name}. 3 tugas/minggu, dari dasar ke kompleks.`,
+      studyplan: `Buat rencana belajar ${weeks} minggu untuk topik "${topic}", untuk ${role} bernama ${name}. Buat ${weeks * 3} tugas total (3 tugas per minggu), urut dari dasar ke kompleks. Field priority HARUS salah satu dari: "high", "medium", atau "low" (gunakan bahasa Inggris, jangan diterjemahkan). dueDate dalam format YYYY-MM-DD mulai dari hari ini.`,
     };
 
-    // Token budget per type (prompt ~200tk + response must stay under 12k TPM total)
     const MAX_TOKENS: Record<string, number> = {
-      mindmap: 900, flashcards: 800, worksheet: 1000, studyplan: 700,
+      mindmap: 900, flashcards: 800, worksheet: 1000, studyplan: 1200,
     };
 
     const ERRORS: Record<string, string> = {
@@ -71,7 +89,8 @@ export async function POST(req: NextRequest) {
     const raw = await callGroq(prompt, MAX_TOKENS[type]);
 
     try {
-      const data = parseJSON(raw);
+      let data = parseJSON(raw);
+      if (type === "studyplan") data = sanitizeStudyPlan(data);
       return NextResponse.json({ success: true, data });
     } catch {
       return NextResponse.json({ success: false, error: ERRORS[type] });
