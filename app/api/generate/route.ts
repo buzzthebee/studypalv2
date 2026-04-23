@@ -1,20 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "AIzaSyA-SkA6Fj81ubsaaC12Xdx-_6YK497gYGM";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_MODEL = "llama-3.3-70b-versatile";
 
-async function callGemini(prompt: string): Promise<string> {
-  const body = {
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.6, maxOutputTokens: 2048 },
-  };
-  const res = await fetch(GEMINI_URL, {
+async function callGroq(prompt: string): Promise<string> {
+  const res = await fetch(GROQ_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${GROQ_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      max_tokens: 2048,
+      temperature: 0.6,
+      messages: [
+        {
+          role: "system",
+          content: "Kamu adalah asisten pendidikan. Selalu kembalikan HANYA JSON valid tanpa markdown, backtick, atau teks tambahan apapun.",
+        },
+        { role: "user", content: prompt },
+      ],
+    }),
   });
   const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  return data.choices?.[0]?.message?.content || "";
 }
 
 export async function POST(req: NextRequest) {
@@ -55,7 +66,7 @@ export async function POST(req: NextRequest) {
       
       Buat 4-6 subtopik utama, masing-masing dengan 2-4 detail. Sesuaikan dengan tingkat ${userRole || "pelajar"}.`;
 
-      const raw = await callGemini(prompt);
+      const raw = await callGroq(prompt);
       try {
         const clean = raw.replace(/```json|```/g, "").trim();
         const json = JSON.parse(clean);
@@ -73,13 +84,14 @@ export async function POST(req: NextRequest) {
       {
         "title": "${topic}",
         "cards": [
-          {"id": "1", "front": "Pertanyaan/Istilah", "back": "Jawaban/Definisi lengkap", "mastered": false, "reviewCount": 0}
+          {"id": "1", "front": "Pertanyaan/Istilah", "back": "Jawaban/Definisi lengkap", "mastered": false, "reviewCount": 0},
+          {"id": "2", "front": "Pertanyaan 2", "back": "Jawaban 2", "mastered": false, "reviewCount": 0}
         ]
       }
       
-      Pastikan pertanyaan beragam: definisi, contoh, perbandingan, aplikasi. Sesuaikan dengan ${userRole}.`;
+      Pastikan pertanyaan beragam: definisi, contoh, perbandingan, aplikasi. Sesuaikan dengan ${userRole}. Buat tepat ${count} kartu.`;
 
-      const raw = await callGemini(prompt);
+      const raw = await callGroq(prompt);
       try {
         const clean = raw.replace(/```json|```/g, "").trim();
         const json = JSON.parse(clean);
@@ -123,11 +135,9 @@ export async function POST(req: NextRequest) {
             ]
           }
         ]
-      }
-      
-      Buat ${Math.ceil(questionCount * 0.7)} soal pilihan ganda dan ${Math.floor(questionCount * 0.3)} soal essay.`;
+      }`;
 
-      const raw = await callGemini(prompt);
+      const raw = await callGroq(prompt);
       try {
         const clean = raw.replace(/```json|```/g, "").trim();
         const json = JSON.parse(clean);
@@ -159,7 +169,7 @@ export async function POST(req: NextRequest) {
       
       Buat 3-5 tugas per minggu, mulai dari yang mendasar ke yang kompleks.`;
 
-      const raw = await callGemini(prompt);
+      const raw = await callGroq(prompt);
       try {
         const clean = raw.replace(/```json|```/g, "").trim();
         const json = JSON.parse(clean);
@@ -175,3 +185,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
   }
 }
+
