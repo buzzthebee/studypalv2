@@ -10,6 +10,38 @@ interface Props {
 
 const DAYS = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"];
 
+const exportToGoogleCalendar = (task: StudyTask) => {
+  const startDate = task.dueDate.replace(/-/g, ""); // format YYYYMMDD
+  const url = new URL("https://calendar.google.com/calendar/render");
+  url.searchParams.set("action", "TEMPLATE");
+  url.searchParams.set("text", task.title);
+  url.searchParams.set("dates", `${startDate}/${startDate}`);
+  url.searchParams.set("details", task.notes || `Mata pelajaran: ${task.subject}`);
+  window.open(url.toString(), "_blank");
+};
+
+const exportWeeklyToCalendar = (task: WeeklyTask) => {
+  // Hitung tanggal hari ini berdasarkan day name
+  const dayIndex = ["Senin","Selasa","Rabu","Kamis","Jumat","Sabtu","Minggu"].indexOf(task.day);
+  const today = new Date();
+  const todayDay = today.getDay() === 0 ? 6 : today.getDay() - 1; // 0=Senin
+  const diff = dayIndex - todayDay;
+  const targetDate = new Date(today);
+  targetDate.setDate(today.getDate() + diff);
+  
+  const dateStr = targetDate.toISOString().split("T")[0].replace(/-/g, "");
+  const startTime = `${dateStr}T080000`; // default jam 8 pagi
+  const endTime = `${dateStr}T${String(8 + Math.floor(task.duration / 60)).padStart(2,"0")}${String(task.duration % 60).padStart(2,"0")}00`;
+  
+  const url = new URL("https://calendar.google.com/calendar/render");
+  url.searchParams.set("action", "TEMPLATE");
+  url.searchParams.set("text", `📚 ${task.title}`);
+  url.searchParams.set("dates", `${startTime}/${endTime}`);
+  url.searchParams.set("details", `Belajar: ${task.subject} | Durasi: ${task.duration} menit`);
+  url.searchParams.set("recur", "RRULE:FREQ=WEEKLY"); // recurring mingguan!
+  window.open(url.toString(), "_blank");
+};
+
 export default function StudyPlan({ state, setState }: Props) {
   const [tab, setTab] = useState<"todo" | "weekly">("todo");
   const [showAdd, setShowAdd] = useState(false);
