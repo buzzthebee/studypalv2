@@ -36,6 +36,7 @@ export interface WeeklyTask {
 export interface MindMapNode {
   id: string;
   label: string;
+  description?: string;
   children: MindMapNode[];
   color?: string;
 }
