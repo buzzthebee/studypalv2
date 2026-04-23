@@ -1,0 +1,93 @@
+{
+  "name": "StudyPal Chatbot Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "public": true,
+        "options": {}
+      },
+      "id": "chat-trigger",
+      "name": "AI Chat Trigger",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "studypal-chat-001"
+    },
+    {
+      "parameters": {
+        "model": "gemini-1.5-flash",
+        "options": {
+          "temperature": 0.7,
+          "maxOutputTokens": 2048
+        }
+      },
+      "id": "gemini-model",
+      "name": "Gemini 1.5 Flash",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [480, 500],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "gemini-creds",
+          "name": "Google Gemini API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "fromInput",
+        "sessionKey": "={{ $json.sessionId }}",
+        "contextWindowLength": 20
+      },
+      "id": "memory-buffer",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1,
+      "position": [480, 640]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.chatInput }}",
+        "options": {
+          "systemMessage": "Kamu adalah AI Buddy pendidikan yang bernama StudyPal. Tugasmu membantu pelajar dan pengajar dari semua tingkatan.\n\nATURAN:\n1. Analisis konteks percakapan untuk mendeteksi peran pengguna (siswa SD/SMP/SMA, mahasiswa, peneliti, pengajar)\n2. Sesuaikan gaya bahasa dan kedalaman konten dengan peran yang terdeteksi\n3. Selalu jawab dengan komplit dan komprehensif\n4. TOLAK pertanyaan yang tidak berkaitan dengan pendidikan dengan bahasa halus\n5. TOLAK konten seksual (kecuali edukasi kesehatan), kekerasan, atau konten tidak etis\n6. Bisa membantu membuat mind map, soal latihan, flashcard, dan rencana belajar\n7. Gunakan format markdown untuk respons yang lebih jelas\n\nBahasa utama: Indonesia. Bisa juga berbahasa Inggris jika diminta."
+        }
+      },
+      "id": "ai-agent",
+      "name": "StudyPal Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter dan validasi output AI\nconst output = $input.first().json.output || '';\n\n// Deteksi role dari response\nconst roleMatch = output.match(/\\[ROLE:([\\w_]+)\\]/);\nconst detectedRole = roleMatch ? roleMatch[1] : 'umum';\nconst cleanOutput = output.replace(/\\[ROLE:[\\w_]+\\]/g, '').trim();\n\nreturn [{\n  json: {\n    reply: cleanOutput,\n    detectedRole: detectedRole,\n    timestamp: new Date().toISOString(),\n    success: true\n  }\n}];"
+      },
+      "id": "response-processor",
+      "name": "Process Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 300]
+    }
+  ],
+  "connections": {
+    "AI Chat Trigger": {
+      "main": [[{"node": "StudyPal Agent", "type": "main", "index": 0}]]
+    },
+    "Gemini 1.5 Flash": {
+      "ai_languageModel": [[{"node": "StudyPal Agent", "type": "ai_languageModel", "index": 0}]]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [[{"node": "StudyPal Agent", "type": "ai_memory", "index": 0}]]
+    },
+    "StudyPal Agent": {
+      "main": [[{"node": "Process Response", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}
