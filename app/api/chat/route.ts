@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 const N8N_WEBHOOK = process.env.N8N_WEBHOOK_URL || "";
 const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_MODEL = "llama-3.3-70b-versatile";
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,7 +26,6 @@ export async function POST(req: NextRequest) {
 
         if (res.ok) {
           const data = await res.json();
-          // n8n bisa return berbagai format, kita handle semuanya
           const reply =
             data.reply ||
             data.output ||
@@ -39,11 +38,11 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ reply, detectedRole });
         }
       } catch (n8nErr) {
-        console.warn("n8n gagal, fallback ke Gemini langsung:", n8nErr);
+        console.warn("n8n gagal, fallback ke Groq langsung:", n8nErr);
       }
     }
 
-    // Fallback: langsung ke Gemini API
+    // Fallback: langsung ke Groq API
     const systemPrompt = `Kamu adalah AI Buddy pendidikan bernama StudyPal, teman belajar yang ramah dan inklusif.
 
 Nama pengguna: ${userName || "Kawan"}
@@ -58,26 +57,28 @@ INSTRUKSI:
 
 Di akhir respons tambahkan tag: [ROLE:siswa_sd|siswa_smp|siswa_sma|mahasiswa|peneliti|pengajar|umum]`;
 
-    const contents = [
+    const messages = [
+      { role: "system", content: systemPrompt },
       ...history.slice(-20).map((h: { role: string; content: string }) => ({
-        role: h.role === "assistant" ? "model" : "user",
-        parts: [{ text: h.content }],
+        role: h.role === "assistant" ? "assistant" : "user",
+        content: h.content,
       })),
-      { role: "user", parts: [{ text: message }] },
+      { role: "user", content: message },
     ];
 
-    const geminiRes = await fetch(GEMINI_URL, {
+    const groqRes = await fetch(GROQ_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${GROQ_API_KEY}` },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        contents,
-        generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
+        model: GROQ_MODEL,
+        messages,
+        temperature: 0.7,
+        max_tokens: 2048,
       }),
     });
 
-    const geminiData = await geminiRes.json();
-    const rawReply = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "Maaf, aku tidak bisa menjawab saat ini.";
+    const groqData = await groqRes.json();
+    const rawReply = groqData.choices?.[0]?.message?.content || "Maaf, aku tidak bisa menjawab saat ini.";
     const roleMatch = rawReply.match(/\[ROLE:([\w_]+)\]/);
     const detectedRole = roleMatch ? roleMatch[1] : userRole;
     const cleanReply = rawReply.replace(/\[ROLE:[\w_]+\]/g, "").trim();
