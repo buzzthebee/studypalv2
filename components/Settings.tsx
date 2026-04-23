@@ -242,89 +242,83 @@ export default function Settings({ state, setState }: Props) {
 }
 
 async function generatePDF(worksheet: any, userName: string, aiName: string) {
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) { alert("Izinkan popup untuk mengunduh PDF"); return; }
-
   const mcQuestions = worksheet.sections?.find((s: any) => s.type === "pilihan_ganda");
   const essayQuestions = worksheet.sections?.find((s: any) => s.type === "essay");
 
-  const html = `<!DOCTYPE html>
-<html lang="id">
-<head>
-<meta charset="UTF-8">
-<title>${worksheet.title}</title>
-<style>
-  body { font-family: 'Times New Roman', serif; margin: 0; padding: 30px; color: #111; font-size: 12pt; }
-  .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 12px; margin-bottom: 20px; }
-  .header h1 { font-size: 16pt; font-weight: 900; margin: 0 0 4px; }
-  .header p { margin: 2px; font-size: 11pt; }
-  .meta-row { display: flex; justify-content: space-between; margin: 16px 0; font-size: 11pt; }
-  .meta-row span { border-bottom: 1px solid #888; min-width: 200px; display: inline-block; }
-  .section-title { font-size: 13pt; font-weight: 700; margin: 22px 0 10px; text-transform: uppercase; }
-  .question { margin-bottom: 16px; }
-  .question-text { font-weight: 600; margin-bottom: 6px; }
-  .options { margin-left: 20px; }
-  .option { margin-bottom: 4px; }
-  .answer-key { margin-top: 40px; border-top: 2px dashed #888; padding-top: 16px; page-break-before: always; }
-  .answer-key-title { font-size: 14pt; font-weight: 900; text-align: center; margin-bottom: 16px; }
-  .answer-row { display: flex; flex-wrap: wrap; gap: 10px 24px; }
-  .answer-item { font-size: 11pt; }
-  .instructions { font-style: italic; color: #555; margin-bottom: 14px; font-size: 11pt; border-left: 3px solid #888; padding-left: 10px; }
-  .generated-by { text-align: center; font-size: 9pt; color: #888; margin-top: 30px; }
-  @media print { body { margin: 0; padding: 20px; } }
-</style>
-</head>
-<body>
-<div class="header">
-  <h1>${worksheet.title}</h1>
-  <p>Dibuat oleh ${aiName} · ${worksheet.date}</p>
-</div>
-<div class="meta-row">
-  <div>Nama: <span>${userName || "________________"}</span></div>
-  <div>Kelas: <span>________________</span></div>
-  <div>Tanggal: <span>${worksheet.date}</span></div>
-</div>
-<p class="instructions">📌 ${worksheet.instructions}</p>
+  // Buat elemen container sementara di DOM (tidak terlihat user)
+  const container = document.createElement("div");
+  container.style.cssText = "position:fixed;left:-9999px;top:0;width:794px;background:#fff;color:#111;font-family:'Times New Roman',serif;font-size:12pt;padding:40px;box-sizing:border-box;";
 
-${mcQuestions ? `
-<div class="section-title">A. ${mcQuestions.title}</div>
-${mcQuestions.questions.map((q: any) => `
-<div class="question">
-  <div class="question-text">${q.no}. ${q.question}</div>
-  <div class="options">
-    ${q.options.map((opt: string) => `<div class="option">${opt}</div>`).join("")}
-  </div>
-</div>`).join("")}` : ""}
+  container.innerHTML = `
+    <div style="text-align:center;border-bottom:2px solid #333;padding-bottom:12px;margin-bottom:20px;">
+      <h1 style="font-size:16pt;font-weight:900;margin:0 0 4px;">${worksheet.title}</h1>
+      <p style="margin:2px;font-size:11pt;">Dibuat oleh ${aiName} · ${worksheet.date}</p>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin:16px 0;font-size:11pt;">
+      <div>Nama: <span style="border-bottom:1px solid #888;min-width:200px;display:inline-block;">${userName || "________________"}</span></div>
+      <div>Kelas: <span style="border-bottom:1px solid #888;min-width:120px;display:inline-block;">________________</span></div>
+      <div>Tanggal: <span style="border-bottom:1px solid #888;min-width:120px;display:inline-block;">${worksheet.date}</span></div>
+    </div>
+    <p style="font-style:italic;color:#555;margin-bottom:14px;font-size:11pt;border-left:3px solid #888;padding-left:10px;">📌 ${worksheet.instructions}</p>
 
-${essayQuestions ? `
-<div class="section-title">B. ${essayQuestions.title}</div>
-${essayQuestions.questions.map((q: any) => `
-<div class="question">
-  <div class="question-text">${q.no}. (${q.points} poin) ${q.question}</div>
-  <div style="border: 1px dashed #ccc; min-height: 80px; margin-top: 6px; border-radius: 4px;"></div>
-</div>`).join("")}` : ""}
+    ${mcQuestions ? `
+    <div style="font-size:13pt;font-weight:700;margin:22px 0 10px;text-transform:uppercase;">A. ${mcQuestions.title}</div>
+    ${mcQuestions.questions.map((q: any) => `
+    <div style="margin-bottom:16px;">
+      <div style="font-weight:600;margin-bottom:6px;">${q.no}. ${q.question}</div>
+      <div style="margin-left:20px;">
+        ${q.options.map((opt: string) => `<div style="margin-bottom:4px;">${opt}</div>`).join("")}
+      </div>
+    </div>`).join("")}` : ""}
 
-<div class="answer-key">
-  <div class="answer-key-title">🔑 KUNCI JAWABAN</div>
-  ${mcQuestions ? `
-  <p style="font-weight:700; margin-bottom: 8px;">Pilihan Ganda:</p>
-  <div class="answer-row">
-    ${mcQuestions.questions.map((q: any) => `<div class="answer-item">${q.no}. ${q.answer}</div>`).join("")}
-  </div>
-  ` : ""}
-  ${essayQuestions ? `
-  <p style="font-weight:700; margin-top: 16px; margin-bottom: 8px;">Essay:</p>
-  ${essayQuestions.questions.map((q: any) => `<p>${q.no}. ${q.answer}</p>`).join("")}
-  ` : ""}
-</div>
+    ${essayQuestions ? `
+    <div style="font-size:13pt;font-weight:700;margin:22px 0 10px;text-transform:uppercase;">B. ${essayQuestions.title}</div>
+    ${essayQuestions.questions.map((q: any) => `
+    <div style="margin-bottom:16px;">
+      <div style="font-weight:600;margin-bottom:6px;">${q.no}. (${q.points} poin) ${q.question}</div>
+      <div style="border:1px dashed #ccc;min-height:80px;margin-top:6px;border-radius:4px;"></div>
+    </div>`).join("")}` : ""}
 
-<div class="generated-by">
-  Worksheet ini di-generate oleh ${aiName} · StudyPal Platform
-</div>
+    <div style="margin-top:40px;border-top:2px dashed #888;padding-top:16px;">
+      <div style="font-size:14pt;font-weight:900;text-align:center;margin-bottom:16px;">🔑 KUNCI JAWABAN</div>
+      ${mcQuestions ? `
+      <p style="font-weight:700;margin-bottom:8px;">Pilihan Ganda:</p>
+      <div style="display:flex;flex-wrap:wrap;gap:10px 24px;">
+        ${mcQuestions.questions.map((q: any) => `<div style="font-size:11pt;">${q.no}. ${q.answer}</div>`).join("")}
+      </div>` : ""}
+      ${essayQuestions ? `
+      <p style="font-weight:700;margin-top:16px;margin-bottom:8px;">Essay:</p>
+      ${essayQuestions.questions.map((q: any) => `<p style="margin:4px 0;">${q.no}. ${q.answer}</p>`).join("")}` : ""}
+    </div>
 
-<script>window.onload = function(){ window.print(); }</script>
-</body></html>`;
+    <div style="text-align:center;font-size:9pt;color:#888;margin-top:30px;">
+      Worksheet ini di-generate oleh ${aiName} · StudyPal Platform
+    </div>
+  `;
 
-  printWindow.document.write(html);
-  printWindow.document.close();
+  document.body.appendChild(container);
+
+  // Load html2pdf dari CDN lalu jalankan
+  await new Promise<void>((resolve, reject) => {
+    if ((window as any).html2pdf) { resolve(); return; }
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Gagal load html2pdf"));
+    document.head.appendChild(script);
+  });
+
+  const safeTitle = worksheet.title.replace(/[^a-zA-Z0-9 ]/g, "").trim() || "worksheet";
+  const fileName = `${safeTitle}.pdf`;
+
+  await (window as any).html2pdf().set({
+    margin: [15, 15, 15, 15],
+    filename: fileName,
+    image: { type: "jpeg", quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+    pagebreak: { mode: ["avoid-all", "css"] },
+  }).from(container).save();
+
+  document.body.removeChild(container);
 }
