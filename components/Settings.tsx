@@ -10,6 +10,14 @@ interface Props {
 const ACCENT_COLORS = ["#6C63FF", "#EC4899", "#14B8A6", "#F59E0B", "#EF4444", "#22C55E", "#3B82F6", "#8B5CF6", "#F97316"];
 const AI_AVATARS = ["🦉", "🤖", "🐬", "🦊", "🐼", "🦋", "⭐", "🚀", "🎓", "📚"];
 
+const ROLES = [
+  { id: "siswa_sd",  emoji: "🎒", label: "SD",        sublabel: "Sekolah Dasar" },
+  { id: "siswa_smp", emoji: "📚", label: "SMP",       sublabel: "Sekolah Menengah Pertama" },
+  { id: "siswa_sma", emoji: "🎓", label: "SMA",       sublabel: "Sekolah Menengah Atas" },
+  { id: "mahasiswa", emoji: "🏫", label: "Mahasiswa", sublabel: "Perguruan Tinggi" },
+  { id: "pengajar",  emoji: "👩‍🏫", label: "Pengajar",  sublabel: "Guru / Dosen" },
+];
+
 export default function Settings({ state, setState }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -47,6 +55,37 @@ export default function Settings({ state, setState }: Props) {
               onChange={e => setState(p => ({ ...p, user: { ...p.user, name: e.target.value } }))}
               placeholder="Masukkan namamu..."
             />
+          </div>
+          <div style={{ marginTop: 16 }}>
+            <label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 10 }}>Jenjang Pendidikan</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {ROLES.map(r => (
+                <button
+                  key={r.id}
+                  onClick={() => setState(p => ({ ...p, user: { ...p.user, role: r.id } }))}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "7px 14px",
+                    borderRadius: 10,
+                    border: `2px solid ${state.user.role === r.id ? "var(--accent)" : "var(--border)"}`,
+                    background: state.user.role === r.id ? "color-mix(in srgb, var(--accent) 12%, transparent)" : "var(--card-bg)",
+                    cursor: "pointer",
+                    fontSize: 13,
+                    fontWeight: state.user.role === r.id ? 700 : 500,
+                    color: state.user.role === r.id ? "var(--accent)" : "var(--text2)",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  <span>{r.emoji}</span>
+                  <div style={{ textAlign: "left" }}>
+                    <div>{r.label}</div>
+                    <div style={{ fontSize: 10, opacity: 0.7 }}>{r.sublabel}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
