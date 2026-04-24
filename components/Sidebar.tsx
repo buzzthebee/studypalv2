@@ -54,6 +54,19 @@ export default function Sidebar({ state, setState, activeView, setActiveView, ac
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
+        {/* Logo */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 0 12px 0", borderBottom: "1px solid var(--border)", marginBottom: 12 }}>
+          <img
+            src="https://drive.google.com/uc?export=view&id=1ounr5HUo-3GLZFjumUz4sTRrzGYBGLLh"
+            alt="StudyPal Logo"
+            style={{ width: 36, height: 36, borderRadius: 10, objectFit: "contain" }}
+            onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+          />
+          <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: "-0.5px", color: "var(--accent)" }}>
+            StudyPal
+          </span>
+        </div>
+
         <div className="ai-profile" onClick={() => setActiveView("settings")}>
           <div className="ai-avatar">{state.ai.avatar}</div>
           <div>
